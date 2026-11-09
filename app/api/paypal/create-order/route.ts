@@ -1,0 +1,2 @@
+import {NextResponse} from "next/server";import {createPayPalOrder} from "@/lib/paypal";
+export async function POST(req:Request){try{const {amount,currency,description}=await req.json();const n=Number(amount);if(!Number.isFinite(n)||n<=0||n>1000000)return NextResponse.json({error:"Enter a valid payment amount."},{status:400});const order=await createPayPalOrder(n,currency||"USD",description||"DealMate AI project");return NextResponse.json(order)}catch(e){return NextResponse.json({error:e instanceof Error?e.message:"Payment link creation failed"},{status:500})}}
