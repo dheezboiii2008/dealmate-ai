@@ -1,9 +1,100 @@
 "use client";
-import {useState} from "react";
-type Negotiation={agreed:boolean;price:number;buyer_message:string;vendor_message:string;terms:string;milestones:{title:string;amount:number}[]};
-export default function Home(){const [mode,setMode]=useState<"signup"|"login">("signup");const [role,setRole]=useState("buyer");const [email,setEmail]=useState("");const [password,setPassword]=useState("");const [user,setUser]=useState<{email:string;role:string}|null>(null);const [project,setProject]=useState("");const [budget,setBudget]=useState("500");const [offer,setOffer]=useState("650");const [currency,setCurrency]=useState("USD");const [result,setResult]=useState<Negotiation|null>(null);const [payment,setPayment]=useState<{id:string;url:string}|null>(null);const [busy,setBusy]=useState(false);const [message,setMessage]=useState("");
-async function auth(){setMessage("");if(!email.includes("@")||password.length<8){setMessage("Enter a valid email and a password of at least 8 characters.");return}setBusy(true);try{const r=await fetch("/api/auth",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,password,role,mode})});const d=await r.json();if(!r.ok)throw new Error(d.error);setUser({email,role:d.role||role});setMessage("Welcome! You are signed in.")}catch(e){setMessage(e instanceof Error?e.message:"Authentication failed")}finally{setBusy(false)}}
-async function negotiate(){setBusy(true);setMessage("");setResult(null);setPayment(null);try{const r=await fetch("/api/negotiate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({project,budget:Number(budget),offer:Number(offer),currency})});const d=await r.json();if(!r.ok)throw new Error(d.error);setResult(d);if(!d.agreed)setMessage("The agents could not reach an agreement. Adjust the budget or offer and try again.")}catch(e){setMessage(e instanceof Error?e.message:"Negotiation failed")}finally{setBusy(false)}}
-async function makePayment(){if(!result?.agreed)return;setBusy(true);setMessage("");try{const r=await fetch("/api/paypal/create-order",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({amount:result.price,currency,description:project.slice(0,120)})});const d=await r.json();if(!r.ok)throw new Error(d.error);setPayment(d)}catch(e){setMessage(e instanceof Error?e.message:"Payment link creation failed")}finally{setBusy(false)}}
-return <main className="shell"><nav className="nav"><div className="brand">DealMate<span>AI</span></div><div className="pill">AI contracts · Secure payments</div></nav><section className="hero"><div className="eyebrow">The smarter way to work together</div><h1>Great work starts with a <span style={{color:"#91a8ff"}}>fair deal.</span></h1><p>Let buyer and freelancer AI agents negotiate project terms, agree on a price, and create a PayPal checkout link when both sides approve.</p></section>
-{!user?<div className="grid"><section className="card"><div className="row"><h2>{mode==="signup"?"Create your account":"Welcome back"}</h2><span className="pill">Email login</span></div><p className="muted">Use your email address and password to access your workspace.</p><div className="tabs"><button className={`tab ${mode==="signup"?"active":""}`} onClick={()=>setMode("signup")}>Sign up</button><button className={`tab ${mode==="login"?"active":""}`} onClick={()=>setMode("login")}>Log in</button></div><div className="field"><label>Email address</label><input type="email" placeholder="you@example.com" value={email} onChange={e=>setEmail(e.target.value)}/></div><div className="field"><label>Password (minimum 8 characters)</label><input type="password" placeholder="Enter password" value={password} onChange={e=>setPassword(e.target.value)}/></div>{mode==="signup"&&<div className="field"><label>I am joining as</label><select value={role} onChange={e=>setRole(e.target.value)}><option value="buyer">Buyer / Client</option><option value="vendor">Vendor / Freelancer</option></select></div>}<button className="btn" disabled={busy} onClick={auth}>{busy?"Please wait…":mode==="signup"?"Create account":"Log in"}</button>{message&&<div className="notice">{message}</div>}<p className="small">Demo-ready UI. Configure Supabase before using real accounts. Passwords are never stored by this page.</p></section><section className="card"><div className="eyebrow">How it works</div><h2>From first offer to paid project.</h2><p className="muted">A transparent workflow designed to help clients and independent professionals agree on scope, price and delivery.</p><div className="notice">01 · Describe the project and budget</div><div className="notice">02 · Buyer and vendor agents negotiate</div><div className="notice">03 · Review the proposed terms together</div><div className="notice success">04 · Generate a PayPal checkout link</div></section></div>:<><div className="row" style={{marginBottom:18}}><div><div className="eyebrow">Your workspace</div><h2 style={{margin:"7px 0"}}>Hello, {user.email}</h2><span className="pill">{user.role==="buyer"?"Buyer account":"Vendor account"}</span></div><button className="tab" onClick={()=>{setUser(null);setResult(null);setPayment(null)}}>Sign out</button></div><div className="grid"><section className="card"><h2>Start a negotiation</h2><p className="muted">Enter the project details and let the AI agents suggest a fair agreement.</p><div className="field"><label>Project description</label><textarea value={project} onChange={e=>setProject(e.target.value)} placeholder="e.g. Build a five-page business website with responsive design…"/></div><div className="grid"><div className="field"><label>Buyer's maximum budget</label><input type="number" min="1" value={budget} onChange={e=>setBudget(e.target.value)}/></div><div className="field"><label>Vendor's offer</label><input type="number" min="1" value={offer} onChange={e=>setOffer(e.target.value)}/></div></div><div className="field"><label>Currency</label><select value={currency} onChange={e=>setCurrency(e.target.value)}><option>USD</option><option>INR</option><option>EUR</option><option>GBP</option><option>AUD</option><option>CAD</option></select></div><button className="btn" disabled={busy||!project.trim()} onClick={negotiate}>{busy?"Agents are negotiating…":"Start AI negotiation"}</button></section><section className="card"><h2>Agreement & payment</h2><p className="muted">A payment link is available only after the agents reach an agreement. Review the terms before creating checkout.</p>{result?<><div className="notice success">{result.agreed?"Proposed agreement reached":"No agreement yet"}</div><div className="price">{currency} {Number(result.price).toFixed(2)}</div><p className="muted">{result.terms}</p><div className="chat"><b>Buyer agent</b>{"\n"}{result.buyer_message}{"\n\n"}<b>Vendor agent</b>{"\n"}{result.vendor_message}</div>{result.milestones?.length>0&&<><h3>Milestones</h3>{result.milestones.map((m,i)=><div className="row" key={i}><span className="muted">{m.title}</span><b>{currency} {Number(m.amount).toFixed(2)}</b></div>)}</>}{result.agreed&&<button className="btn" disabled={busy} onClick={makePayment}>Generate PayPal payment link</button>}{payment&&<div className="notice success"><b>PayPal checkout created</b><p className="small">Order ID: {payment.id}</p><a className="btn" style={{display:"block",textAlign:"center"}} href={payment.url} target="_blank" rel="noreferrer">Open PayPal checkout ↗</a></div>}</>:<div className="chat">Your negotiated price, contract terms and payment link will appear here.</div>}{message&&<div className="notice">{message}</div>}</section></div><p className="small" style={{marginTop:20}}>Payments are created as PayPal checkout orders. The payer must approve checkout; this app does not hold funds in escrow or automatically release milestone payments.</p></>}</main>}
+import { useState } from "react";
+
+type Deal = {
+  agreed: boolean; price: number; buyer_message: string; vendor_message: string;
+  terms: string; milestones: { title: string; amount: number }[];
+  transcript?: { agent: string; counter: number; message: string }[];
+};
+
+export default function Home() {
+  const [mode, setMode] = useState<"signup" | "login">("signup");
+  const [role, setRole] = useState("buyer");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [signedIn, setSignedIn] = useState(false);
+  const [project, setProject] = useState("");
+  const [budget, setBudget] = useState("500");
+  const [offer, setOffer] = useState("650");
+  const [currency, setCurrency] = useState("USD");
+  const [deal, setDeal] = useState<Deal | null>(null);
+  const [payment, setPayment] = useState<{ id: string; url: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState("");
+
+  async function authenticate() {
+    setBusy(true); setNotice("");
+    try {
+      const response = await fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password, role, mode }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not sign in");
+      setRole(data.role || role); setSignedIn(true); setNotice(data.message || "Signed in.");
+    } catch (error) { setNotice(error instanceof Error ? error.message : "Authentication failed"); }
+    finally { setBusy(false); }
+  }
+
+  async function negotiate() {
+    setBusy(true); setNotice(""); setDeal(null); setPayment(null);
+    try {
+      const response = await fetch("/api/negotiate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ project, budget: Number(budget), offer: Number(offer), currency }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Negotiation failed");
+      setDeal(data);
+      if (!data.agreed) setNotice("No agreement was reached. Adjust the budget, offer or scope and try again.");
+    } catch (error) { setNotice(error instanceof Error ? error.message : "Negotiation failed"); }
+    finally { setBusy(false); }
+  }
+
+  async function createPayment() {
+    if (!deal?.agreed) return;
+    setBusy(true); setNotice("");
+    try {
+      const response = await fetch("/api/paypal/create-order", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ amount: deal.price, currency, description: project.slice(0, 120) }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Payment link could not be created");
+      setPayment(data);
+    } catch (error) { setNotice(error instanceof Error ? error.message : "Payment creation failed"); }
+    finally { setBusy(false); }
+  }
+
+  return <main className="shell">
+    <nav className="nav"><div className="brand">DealMate<span>AI</span></div><div className="pill">Two agents. One fair deal.</div></nav>
+    <section className="hero"><div className="eyebrow">AI-powered freelance dealmaking</div><h1>Make every deal a <span style={{ color: "#91a8ff" }}>win-win.</span></h1><p>BuyerBot and SellerBot negotiate project pricing and terms, then a neutral mediator checks whether a fair agreement is possible.</p></section>
+
+    {!signedIn ? <div className="grid">
+      <section className="card"><h2>{mode === "signup" ? "Create your account" : "Welcome back"}</h2><p className="muted">Sign in with your email to open your negotiation workspace.</p>
+        <div className="tabs"><button className={`tab ${mode === "signup" ? "active" : ""}`} onClick={() => setMode("signup")}>Sign up</button><button className={`tab ${mode === "login" ? "active" : ""}`} onClick={() => setMode("login")}>Log in</button></div>
+        <div className="field"><label>Email address</label><input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" /></div>
+        <div className="field"><label>Password (at least 8 characters)</label><input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Your password" /></div>
+        {mode === "signup" && <div className="field"><label>Account type</label><select value={role} onChange={e => setRole(e.target.value)}><option value="buyer">Buyer / Client</option><option value="vendor">Vendor / Freelancer</option></select></div>}
+        <button className="btn" disabled={busy} onClick={authenticate}>{busy ? "Please wait…" : mode === "signup" ? "Create account" : "Log in"}</button>
+        {notice && <div className="notice">{notice}</div>}
+        <p className="small">Account creation and login require your Supabase environment variables and email settings.</p>
+      </section>
+      <section className="card"><div className="eyebrow">The process</div><h2>From first offer to checkout.</h2><div className="notice">01 · Describe the project and budget</div><div className="notice">02 · BuyerBot makes a counter-offer</div><div className="notice">03 · SellerBot responds with its position</div><div className="notice">04 · A neutral mediator checks the deal</div><div className="notice success">05 · Create a PayPal checkout after agreement</div></section>
+    </div> : <>
+      <div className="row" style={{ marginBottom: 18 }}><div><div className="eyebrow">Your workspace</div><h2 style={{ margin: "7px 0" }}>Deal negotiation</h2><span className="pill">{role === "buyer" ? "Buyer account" : "Vendor account"}</span></div><button className="tab" onClick={() => { setSignedIn(false); setDeal(null); setPayment(null); setNotice(""); }}>Sign out</button></div>
+      <div className="grid">
+        <section className="card"><h2>Start a negotiation</h2><p className="muted">Give both agents enough context to negotiate a realistic deal.</p>
+          <div className="field"><label>Project description</label><textarea value={project} onChange={e => setProject(e.target.value)} placeholder="e.g. Build a responsive five-page business website, including contact form and deployment…" /></div>
+          <div className="grid"><div className="field"><label>Buyer's maximum budget</label><input type="number" min="1" value={budget} onChange={e => setBudget(e.target.value)} /></div><div className="field"><label>Vendor's opening offer</label><input type="number" min="1" value={offer} onChange={e => setOffer(e.target.value)} /></div></div>
+          <div className="field"><label>Currency</label><select value={currency} onChange={e => setCurrency(e.target.value)}><option value="USD">USD</option><option value="INR">INR</option><option value="EUR">EUR</option><option value="GBP">GBP</option><option value="AUD">AUD</option><option value="CAD">CAD</option></select></div>
+          <button className="btn" disabled={busy || !project.trim()} onClick={negotiate}>{busy ? "Agents are negotiating…" : "Start AI negotiation"}</button>
+        </section>
+        <section className="card"><h2>Negotiation result</h2><p className="muted">The agent messages, proposed terms and payment checkout appear here.</p>
+          {!deal ? <div className="chat">Your negotiation transcript will appear here when both agents have taken their turns.</div> : <>
+            <div className={deal.agreed ? "notice success" : "notice"}>{deal.agreed ? "Potential agreement reached — review before proceeding." : "No agreement reached yet."}</div>
+            {deal.agreed && <div className="price">{currency} {deal.price.toFixed(2)}</div>}
+            <div className="chat"><b>BuyerBot</b>{"\n"}{deal.buyer_message}{"\n\n"}<b>SellerBot</b>{"\n"}{deal.vendor_message}</div>
+            <h3>Proposed terms</h3><p className="muted">{deal.terms}</p>
+            {deal.milestones?.length > 0 && <><h3>Suggested milestones</h3>{deal.milestones.map((m, i) => <div className="row" key={i}><span className="muted">{m.title}</span><b>{currency} {Number(m.amount).toFixed(2)}</b></div>)}</>}
+            {deal.agreed && <button className="btn" disabled={busy} onClick={createPayment}>Generate PayPal checkout link</button>}
+            {payment && <div className="notice success"><b>PayPal checkout created</b><p className="small">Order ID: {payment.id}</p><a className="btn" href={payment.url} target="_blank" rel="noreferrer" style={{ display: "block", textAlign: "center" }}>Open PayPal checkout ↗</a></div>}
+          </>}
+          {notice && <div className="notice">{notice}</div>}
+        </section>
+      </div>
+      <p className="small" style={{ marginTop: 20 }}>Payment links create PayPal checkout orders. This is not escrow; do not treat a browser redirect as proof of payment. The parties must independently review and accept the final terms.</p>
+    </>}
+  </main>;
+}
